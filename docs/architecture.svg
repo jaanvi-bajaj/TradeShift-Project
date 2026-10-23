@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="900" viewBox="0 0 1400 900" font-family="Helvetica, Arial, sans-serif">
+  <!-- TradeShift architecture, one page for the slides. Edit this file; docs/architecture-diagram.png is an export of it. -->
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5c6b73"/>
+    </marker>
+    <style>
+      .box { fill: #fff; stroke: #c8d0da; stroke-width: 1.5; rx: 10; }
+      .title { font-size: 19px; font-weight: 700; fill: #1d2733; }
+      .sub { font-size: 14px; fill: #5c6b73; }
+      .zone { font-size: 15px; fill: #5c6b73; font-weight: 600; }
+      .flow { stroke: #5c6b73; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+      .lbl { font-size: 13px; fill: #5c6b73; }
+    </style>
+  </defs>
+  <rect width="1400" height="900" fill="#f6f8fb"/>
+  <text x="40" y="52" font-size="28" font-weight="700" fill="#1d2733">TradeShift on AWS: only the load balancer faces the internet; the database stays private</text>
+
+  <!-- Outside -->
+  <rect class="box" x="60" y="90" width="360" height="84"/>
+  <text class="title" x="80" y="124">Public data (downloaded once, off-AWS)</text>
+  <text class="sub" x="80" y="150">US Census · UN Comtrade · SingStat → GitHub release</text>
+  <rect class="box" x="980" y="90" width="360" height="84"/>
+  <text class="title" x="1000" y="124">Users</text>
+  <text class="sub" x="1000" y="150">Browser, HTTP</text>
+  <rect class="box" x="520" y="90" width="360" height="84"/>
+  <text class="title" x="540" y="124">GitHub</text>
+  <text class="sub" x="540" y="150">Code (git clone) · wheel bundle · data snapshot</text>
+
+  <!-- VPC -->
+  <rect x="40" y="215" width="1320" height="500" rx="14" fill="none" stroke="#8a94a6" stroke-width="2" stroke-dasharray="8 6"/>
+  <text class="zone" x="940" y="707">VPC 10.20.0.0/16 · us-east-1 · two Availability Zones</text>
+  <rect x="70" y="260" width="1260" height="210" rx="12" fill="#eef1f5"/>
+  <text class="zone" x="1100" y="460">Public subnets (AZ a, AZ b)</text>
+  <rect x="70" y="490" width="1260" height="200" rx="12" fill="#eef1f5"/>
+  <text class="zone" x="1060" y="680">Private subnets (AZ a, AZ b)</text>
+
+  <rect class="box" x="100" y="300" width="360" height="140"/>
+  <text class="title" x="120" y="335">Batch EC2 (t3.small) + EBS</text>
+  <text class="sub" x="120" y="362">Restores the snapshot, or downloads</text>
+  <text class="sub" x="120" y="384">clean → metrics → detector → DiD</text>
+  <text class="sub" x="120" y="406">→ Singapore → explain → load RDS</text>
+  <text class="sub" x="120" y="428">EBS snapshot after each run</text>
+
+  <rect x="520" y="300" width="360" height="140" rx="10" fill="#dbe7f8" stroke="#1f6feb" stroke-width="3"/>
+  <text class="title" x="540" y="335">Auto Scaling Group</text>
+  <text class="sub" x="540" y="362">Web EC2 (t3.micro), 2 to 3, one per AZ</text>
+  <text class="sub" x="540" y="384">Flask + gunicorn, stateless</text>
+  <text class="sub" x="540" y="406">Target tracking: average CPU 50%</text>
+  <text class="sub" x="540" y="428">Launch template, IMDSv2, LabInstanceProfile</text>
+
+  <rect class="box" x="980" y="300" width="330" height="140"/>
+  <text class="title" x="1000" y="335">Application Load Balancer</text>
+  <text class="sub" x="1000" y="362">Public entry point, port 80</text>
+  <text class="sub" x="1000" y="384">Health checks on /health</text>
+  <text class="sub" x="1000" y="406">Spreads requests across both AZs</text>
+
+  <rect class="box" x="520" y="520" width="360" height="130"/>
+  <text class="title" x="540" y="555">RDS PostgreSQL 16 (db.t3.micro)</text>
+  <text class="sub" x="540" y="582">Trade data, signals, HHI, DiD results</text>
+  <text class="sub" x="540" y="604">Saved-analysis metadata, notes (indexed)</text>
+  <text class="sub" x="540" y="626">No public address · daily backups</text>
+
+  <!-- S3 -->
+  <rect class="box" x="100" y="750" width="360" height="110"/>
+  <text class="title" x="120" y="785">Amazon S3</text>
+  <text class="sub" x="120" y="812">raw/ (→ Standard-IA after 30 days)</text>
+  <text class="sub" x="120" y="834">processed/ · analyses/ (Markdown)</text>
+  <rect class="box" x="520" y="750" width="820" height="110"/>
+  <text class="title" x="540" y="785">Built by one CloudFormation stack</text>
+  <text class="sub" x="540" y="812">Security groups: internet → ALB → web → RDS; batch → RDS; SSH to batch from one IP only</text>
+  <text class="sub" x="540" y="834">CloudWatch logs, 5 alarms and a dashboard · LabRole · optional US$10 budget · no NAT Gateway</text>
+
+  <!-- Flows -->
+  <path class="flow" d="M1160,174 L1160,300"/><text class="lbl" x="1170" y="245">HTTP</text>
+  <path class="flow" d="M980,370 L884,370"/><text class="lbl" x="900" y="360">forward</text>
+  <path class="flow" d="M700,440 L700,518"/><text class="lbl" x="710" y="490">queries, notes</text>
+  <path class="flow" d="M290,440 L290,580 L516,580"/><text class="lbl" x="300" y="570">loads</text>
+  <path class="flow" d="M240,440 L240,746"/><text class="lbl" x="250" y="735">raw + processed</text>
+  <path class="flow" d="M540,440 L540,478 L494,478 L494,732 L430,732 L430,746"/><text class="lbl" x="502" y="725">saved analyses</text>
+  <path class="flow" d="M700,174 L700,296"/><text class="lbl" x="710" y="210">git clone, packages</text>
+  <path class="flow" d="M620,174 L620,200 L330,200 L330,296"/><text class="lbl" x="400" y="194">snapshot</text>
+  <path class="flow" d="M240,174 L240,296" stroke-dasharray="5 4"/><text class="lbl" x="140" y="205">full mode only</text>
+</svg>
