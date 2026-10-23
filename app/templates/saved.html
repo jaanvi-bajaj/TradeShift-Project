@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "_analysis.html" import render with context %}
+{% from "_notes.html" import notes_box with context %}
 {% block title %}{{ a.title }}{% endblock %}
 {% block filterbar %}{% endblock %}
 {% block content %}
@@ -12,4 +13,5 @@
 </details>
 {% endif %}
 {{ render(a, saveable=False) }}
+{{ notes_box(notes, 'analysis', row.id | string, a.meta) }}
 {% endblock %}
