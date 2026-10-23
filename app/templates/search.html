@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Search{% endblock %}
+{% block filterbar %}{% endblock %}
+{% block content %}
+<h1>Search saved analyses and notes</h1>
+<form class="controls" method="get">
+  <input type="hidden" name="go" value="1">
+  <label>HS code (2, 4 or 6 digits) <input name="hs" value="{{ f.hs }}" size="8" placeholder="8450"></label>
+  <label>Importer <input name="importer" value="{{ f.importer }}" size="4" placeholder="US"></label>
+  <label>Supplier <input name="supplier" value="{{ f.supplier }}" size="4" placeholder="CN"></label>
+  <label>Tariff event
+    <select name="event_id"><option value="">Any</option>
+      {% for e in events %}<option value="{{ e.event_id }}" {{ 'selected' if e.event_id == f.event_id }}>{{ e.name }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>From <input type="date" name="date_from" value="{{ f.date_from }}"></label>
+  <label>To <input type="date" name="date_to" value="{{ f.date_to }}"></label>
+  <label>Show
+    <select name="kind">
+      {% for k, label in (('both', 'Analyses and notes'), ('analysis', 'Analyses'), ('note', 'Notes')) %}
+        <option value="{{ k }}" {{ 'selected' if kind == k }}>{{ label }}</option>{% endfor %}
+    </select>
+  </label>
+  <button type="submit">Search</button>
+  <a href="?go=1&preset=6m&hs={{ f.hs }}">Last 6 months</a>
+</form>
+{% if searched %}
+<p class="timing">{{ results | length }} result{{ '' if results | length == 1 else 's' }} in <strong>{{ '%.0f' % elapsed_ms }} ms</strong> (target: under 2,000 ms).</p>
+<table>
+  <thead><tr><th>Type</th><th>Title / note</th><th>HS code</th><th>Importer</th><th>Supplier</th><th>Event</th><th>Date</th></tr></thead>
+  <tbody>
+  {% for r in results %}
+    <tr><td>{{ r.kind }}</td>
+        <td class="wide">{% if r.kind == 'analysis' %}<a href="{{ url_for('history.show', analysis_id=r.id) }}">{{ r.text }}</a>
+            {% elif r.view == 'analysis' %}<a href="{{ url_for('history.show', analysis_id=r.id) }}">{{ r.text }}</a>
+            {% else %}<a href="/explorer?hs6={{ r.id }}">{{ r.text }}</a>{% endif %}</td>
+        <td>{{ r.hs6 | hs if r.hs6 else '–' }}</td><td>{{ r.importer or '–' }}</td><td>{{ r.supplier or '–' }}</td>
+        <td>{{ r.event_id or '–' }}</td><td>{{ r.created_at.strftime('%d %b %Y') }}</td></tr>
+  {% else %}
+    <tr><td colspan="7" class="muted">No matches.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endblock %}
