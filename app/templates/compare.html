@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% from "_analysis.html" import render with context %}
+{% block title %}Compare{% endblock %}
+{% block controls %}
+<form class="controls" method="get">
+  {% for k in ('importer', 'hs6', 'supplier') %}<input type="hidden" name="{{ k }}" value="{{ f[k] }}">{% endfor %}
+  <label>Compare
+    <select name="mode" data-compare-mode>
+      <option value="suppliers" {{ 'selected' if mode == 'suppliers' }}>two suppliers (same importer and product)</option>
+      <option value="products" {{ 'selected' if mode == 'products' }}>two products (same importer; supplier optional)</option>
+      <option value="importers" {{ 'selected' if mode == 'importers' }}>two importers (same product; supplier, default China)</option>
+    </select>
+  </label>
+  <label>A <input name="a" value="{{ va }}" size="8" required></label>
+  <label>B <input name="b" value="{{ vb }}" size="8" required></label>
+  <label>From <input type="number" name="start" value="{{ start }}" min="2016" max="2030"></label>
+  <label>To <input type="number" name="end" value="{{ end }}" min="2016" max="2030"></label>
+  <button type="submit">Compare</button>
+  <p class="muted">A and B are ISO country codes (CN, VN) for suppliers or importers (US, JP), or HS6 codes for products.
+     Shares are in %, values are indexed to 100 at the start so markets of different size compare fairly.</p>
+</form>
+{% endblock %}
+{% block content %}{{ render(a) }}{% endblock %}
