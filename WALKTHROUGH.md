@@ -60,7 +60,7 @@ press Enter. Click **CloudFormation**.
 **Step 6.** Under "Specify template", click **Upload a template file**. Click **Choose file**.
 Find and pick this file on your computer:
 
-`tradeshift / infra / cloudformation / tradeshift.yaml`
+`TradeShift-Project / infra / cloudformation / tradeshift.yaml`
 
 Then click **Next** (bottom right).
 
