@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% from "_analysis.html" import render with context %}
+{% block title %}Explorer{% endblock %}
+{% block controls %}
+<form class="controls" method="get">
+  {% for k in ('importer', 'hs6', 'supplier') %}<input type="hidden" name="{{ k }}" value="{{ f[k] }}">{% endfor %}
+  <label>Shares
+    <select name="smooth" onchange="this.form.submit()">
+      <option value="1" {{ 'selected' if smooth }}>12-month average (removes seasonality)</option>
+      <option value="0" {{ 'selected' if not smooth }}>Monthly</option>
+    </select>
+  </label>
+</form>
+{% endblock %}
+{% block content %}
+{{ render(a) }}
+{% endblock %}

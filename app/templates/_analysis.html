@@ -1,0 +1,82 @@
+{#- Renders one analysis dict (app/views/common.py): summary, charts, tables, sources and the
+    "Save analysis" form. Live pages and reopened saved analyses both use this, so a saved
+    analysis looks identical to the page it was saved from (Feature 3). -#}
+{% macro render(a, saveable=True) %}
+<section class="analysis">
+  <h1>{{ a.title }}</h1>
+
+  {% if a.summary %}
+  <div class="summary">
+    {% for line in a.summary %}<p>{{ line }}</p>{% endfor %}
+  </div>
+  {% endif %}
+
+  {% for chart in a.charts %}
+  <figure class="chart">
+    <figcaption>{{ chart.title }}</figcaption>
+    <div class="chart-box"><canvas id="chart-{{ chart.id }}"></canvas></div>
+    <script type="application/json" data-chart="chart-{{ chart.id }}">{{ chart | tojson }}</script>
+  </figure>
+  {% endfor %}
+
+  {% for table in a.tables %}
+  <div class="table-wrap">
+    <h2>{{ table.title }}</h2>
+    {% if table.rows %}
+    <table>
+      <thead><tr>
+        {% for c in table.columns %}<th class="{{ 'num' if c.format }}">{{ c.label }}</th>{% endfor %}
+        {% if table.links %}<th>Sources</th>{% endif %}
+      </tr></thead>
+      <tbody>
+      {% for row in table.rows %}
+        <tr>
+          {% for c in table.columns %}
+            {% set v = row.get(c.key) %}
+            <td class="{{ 'num' if c.format }} {{ 'wide' if c.key in ('explanation',) }}">
+              {%- if c.key == 'product' and row.hs6 and (table.links or table.hs_links) -%}
+                <a href="/explorer?importer=US&hs6={{ row.hs6 }}">{{ v }}</a>
+              {%- elif c.key == 'product' and row.hs6 and table.sg_links -%}
+                <a href="/singapore?hs6={{ row.hs6 }}">{{ v }}</a>
+              {%- elif c.key == 'confidence' and v -%}
+                <span class="badge {{ v | replace(' ', '-') }}">{{ v }}</span>
+              {%- elif c.format -%}
+                {{ v | format_value(c.format) }}
+              {%- else -%}
+                {{ '–' if v is none else v }}
+              {%- endif -%}
+            </td>
+          {% endfor %}
+          {% if table.links %}
+            <td class="links">
+              {% if row.data_url %}<a href="{{ row.data_url }}">data</a>{% endif %}
+              {% if row.source_url %}<a href="{{ row.source_url }}" target="_blank" rel="noopener">tariff notice</a>{% endif %}
+            </td>
+          {% endif %}
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <p class="muted">Nothing to show for these choices.</p>
+    {% endif %}
+  </div>
+  {% endfor %}
+
+  {% if a.sources %}
+  <ul class="sources">
+    {% for s in a.sources %}
+      <li>Source: <a href="{{ s.url }}" {% if s.url.startswith('http') %}target="_blank" rel="noopener"{% endif %}>{{ s.label }}</a></li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  {% if saveable %}
+  <form class="save" method="post" action="/history/save">
+    <input type="hidden" name="analysis" value="{{ analysis_json(a) }}">
+    <input name="title" value="{{ a.title }}" aria-label="Title for the saved analysis">
+    <button type="submit">Save analysis</button>
+  </form>
+  {% endif %}
+</section>
+{% endmacro %}

@@ -1,0 +1,59 @@
+{#- Base layout for every page: header, navigation, shared filter bar, footer with instance ID.
+    Child templates fill the "controls" and "content" blocks. -#}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}TradeShift{% endblock %} · TradeShift</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+  {# Chart.js is served from this app, not a CDN, so the demo makes no external calls. #}
+  <script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='app.js') }}" defer></script>
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="/">Trade<span>Shift</span></a>
+  <nav>
+    {% for endpoint, label in nav %}
+      {% set href = url_for(endpoint) %}
+      <a href="{{ href }}" class="{{ 'active' if path.startswith(href) else '' }}">{{ label }}</a>
+    {% endfor %}
+  </nav>
+</header>
+
+{% block filterbar %}
+{# Shared filters: the same importer / product / supplier carry across pages via the URL. #}
+<form class="filterbar" method="get" action="{{ request.path }}">
+  {% for key, value in request.args.items() if key not in ('importer', 'hs6', 'supplier') %}
+    <input type="hidden" name="{{ key }}" value="{{ value }}">
+  {% endfor %}
+  <label>Importer
+    <select name="importer">
+      {% for imp in (importers or ['US', 'JP']) %}
+        <option value="{{ imp }}" {{ 'selected' if f.importer == imp }}>{{ {'US': 'United States', 'JP': 'Japan'}.get(imp, imp) }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label class="grow">Product (HS6 code or keyword)
+    <input name="hs6" value="{{ f.hs6 }}" list="product-options" data-product-search autocomplete="off" required>
+    <datalist id="product-options"></datalist>
+  </label>
+  <label>Supplier (ISO code)
+    <input name="supplier" value="{{ f.supplier }}" placeholder="e.g. CN" size="6" maxlength="3">
+  </label>
+  <button type="submit">Apply</button>
+</form>
+{% endblock %}
+
+<main>
+  {% block controls %}{% endblock %}
+  {% block content %}{% endblock %}
+</main>
+
+<footer>
+  <span>Served by <strong data-instance>{{ identity.instance_id }}</strong> in {{ identity.az }}</span>
+  <span>Data: US Census, UN Comtrade · Tariffs: Federal Register · Shares show shifts, not proven causation</span>
+</footer>
+</body>
+</html>
