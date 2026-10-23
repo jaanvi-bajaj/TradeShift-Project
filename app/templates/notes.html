@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Notes{% endblock %}
+{% block filterbar %}{% endblock %}
+{% block content %}
+<h1>Notes</h1>
+<p class="muted">Notes are stored in RDS, so they survive restarts and are shared by every web server. Add one from any product page or saved analysis.</p>
+<table>
+  <thead><tr><th>Note</th><th>On</th><th>HS code</th><th>Importer</th><th>Written</th><th>Server</th></tr></thead>
+  <tbody>
+  {% for n in notes %}
+    <tr><td class="wide">{{ n.body }}</td>
+        <td>{% if n.target_type == 'product' %}<a href="/explorer?hs6={{ n.target_id }}">product {{ n.target_id | hs }}</a>
+            {% else %}<a href="{{ url_for('history.show', analysis_id=n.target_id) }}">saved analysis</a>{% endif %}</td>
+        <td>{{ n.hs6 | hs if n.hs6 else '–' }}</td><td>{{ n.importer or '–' }}</td>
+        <td>{{ n.created_at.strftime('%d %b %Y %H:%M') }}</td><td>{{ n.instance_id }}</td></tr>
+  {% else %}
+    <tr><td colspan="6" class="muted">No notes yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

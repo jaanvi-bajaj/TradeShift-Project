@@ -1,0 +1,24 @@
+{#- Notes box (Feature 4). Notes are stored in RDS, so they are shared by every web server. -#}
+{% macro notes_box(notes, target_type, target_id, meta) %}
+<section class="notes">
+  <h2>Notes</h2>
+  <form method="post" action="/notes">
+    <input type="hidden" name="target_type" value="{{ target_type }}">
+    <input type="hidden" name="target_id" value="{{ target_id }}">
+    {% for k in ('hs6', 'importer', 'supplier', 'event_id') %}
+      <input type="hidden" name="{{ k }}" value="{{ meta.get(k) or '' }}">
+    {% endfor %}
+    <input type="hidden" name="next" value="{{ request.full_path }}">
+    <textarea name="body" rows="3" maxlength="5000" placeholder="Add a note for your group…" required></textarea>
+    <button type="submit">Add note</button>
+  </form>
+  {% for n in notes %}
+    <div class="note">
+      <p>{{ n.body }}</p>
+      <small>{{ n.created_at.strftime('%d %b %Y %H:%M') }} UTC · written on {{ n.instance_id }}</small>
+    </div>
+  {% else %}
+    <p class="muted">No notes yet.</p>
+  {% endfor %}
+</section>
+{% endmacro %}

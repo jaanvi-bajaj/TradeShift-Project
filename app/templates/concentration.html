@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "_analysis.html" import render with context %}
+{% from "_notes.html" import notes_box with context %}
 {% block title %}Concentration{% endblock %}
 {% block controls %}
 <form class="controls" method="get">
@@ -16,4 +17,5 @@
 {% endblock %}
 {% block content %}
 {{ render(a) }}
+{{ notes_box(notes, 'product', f.hs6, a.meta) }}
 {% endblock %}
