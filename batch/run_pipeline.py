@@ -3,9 +3,9 @@
 What it does:
     Two modes:
       * full      download (Census, Comtrade, SingStat) -> clean -> metrics -> detector ->
-                  did_check -> singapore -> explain -> load_db -> ebs_snapshot
+                  did_check -> singapore -> explain -> load_db -> load_demo -> ebs_snapshot
       * snapshot  restore the processed data from a snapshot file (no external
-                  data API is called), then load_db -> ebs_snapshot. This is what a
+                  data API is called), then load_db -> load_demo -> ebs_snapshot. This is what a
                   fresh Sandbox session runs, because the Sandbox deletes
                   everything when a session ends.
     After each step succeeds a marker is written to processed/_steps/<step>.json.
@@ -45,6 +45,7 @@ from batch import (
     ebs_snapshot,
     explain,
     load_db,
+    load_demo,
     metrics,
     singapore,
     snapshot,
@@ -67,6 +68,7 @@ FULL_STEPS: list[tuple[str, Callable[[], object], bool]] = [
     ("singapore", singapore.run, False),
     ("explain", explain.run, False),
     ("load_db", load_db.run, False),
+    ("load_demo", load_demo.run, True),
     ("ebs_snapshot", ebs_snapshot.run, True),
 ]
 
@@ -150,6 +152,7 @@ def main() -> None:
         steps = [
             ("restore_snapshot", lambda: snapshot.restore(args.snapshot_url), False),
             ("load_db", load_db.run, False),
+            ("load_demo", load_demo.run, True),
             ("ebs_snapshot", ebs_snapshot.run, True),
         ]
     else:
