@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% from "_analysis.html" import render with context %}
+{% block title %}{{ a.title }}{% endblock %}
+{% block filterbar %}{% endblock %}
+{% block content %}
+{% if just_saved %}<p class="success">Saved to S3 as <code>{{ row.s3_key }}</code>.</p>{% endif %}
+<p class="muted">Saved analysis · {{ row.created_at.strftime('%d %b %Y %H:%M') }} UTC · saved on {{ row.instance_id }} ·
+  <a href="{{ url_for('history.download', analysis_id=row.id) }}">download Markdown</a></p>
+{% if a.params %}
+<details class="inputs"><summary>Inputs used</summary>
+  <ul>{% for k, v in a.params.items() %}<li><strong>{{ k }}</strong>: {{ v }}</li>{% endfor %}</ul>
+</details>
+{% endif %}
+{{ render(a, saveable=False) }}
+{% endblock %}

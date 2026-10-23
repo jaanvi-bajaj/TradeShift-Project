@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}History{% endblock %}
+{% block filterbar %}{% endblock %}
+{% block content %}
+<h1>Saved analyses</h1>
+<p class="muted">Each analysis is a Markdown file in S3; its metadata is in RDS, so every server lists the same history.</p>
+{% if imported %}<p class="success">Import finished: {{ imported }}</p>{% endif %}
+{% if error %}<p class="warning">{{ error }}</p>{% endif %}
+<div class="controls backup">
+  <div>
+    <strong>Keep your work between Sandbox sessions.</strong>
+    <p class="muted">The Sandbox deletes everything when a session ends. Export before you end the lab, then import
+       the file into the next stack. Importing the same file twice adds nothing new.</p>
+  </div>
+  <a class="button" href="{{ url_for('history.export') }}">Export all analyses and notes (.zip)</a>
+  <form method="post" action="{{ url_for('history.import_') }}" enctype="multipart/form-data">
+    <input type="file" name="bundle" accept=".zip,application/zip" required>
+    <button type="submit">Import</button>
+  </form>
+</div>
+<table>
+  <thead><tr><th>Title</th><th>View</th><th>HS code</th><th>Importer</th><th>Supplier</th><th>Event</th><th>Saved</th><th></th></tr></thead>
+  <tbody>
+  {% for r in analyses %}
+    <tr><td><a href="{{ url_for('history.show', analysis_id=r.id) }}">{{ r.title }}</a></td><td>{{ r.view }}</td>
+        <td>{{ r.hs6 | hs if r.hs6 else '–' }}</td><td>{{ r.importer or '–' }}</td><td>{{ r.supplier or '–' }}</td>
+        <td>{{ r.event_id or '–' }}</td><td>{{ r.created_at.strftime('%d %b %Y %H:%M') }}</td>
+        <td><a href="{{ url_for('history.download', analysis_id=r.id) }}">Markdown</a></td></tr>
+  {% else %}
+    <tr><td colspan="8" class="muted">Nothing saved yet. Use "Save analysis" at the bottom of any page.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
