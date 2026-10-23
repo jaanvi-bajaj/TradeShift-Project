@@ -1,0 +1,9 @@
+# scripts/
+
+Developer tools. None of them run during deployment or the demo.
+
+| File | What it does |
+|---|---|
+| `build_tariff_lines.py` | Rebuilds `data/tariff_event_products.csv` from the Federal Register notices |
+| `build_reference.py` | Rebuilds `data/countries.csv` from the Census and Comtrade code lists |
+| `build_wheelhouse.sh` | Builds the offline wheel bundle (Linux, Python 3.11) for the GitHub release |

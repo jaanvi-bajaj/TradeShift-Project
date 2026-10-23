@@ -1,0 +1,22 @@
+# Tool settings for black and ruff (Code standards: "Format with black, lint with ruff").
+[tool.black]
+line-length = 120
+target-version = ["py311"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+extend-exclude = ["local_data", "dist"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "B", "UP"]
+# E501: black decides line length. B905: zip() is used on columns of one DataFrame, which
+# always have equal length. N818: QuotaReached reads better than QuotaReachedError.
+ignore = ["E501", "B905", "N818"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff.lint.isort]
+# Our own packages, so imports sort the same whether or not every module exists yet.
+known-first-party = ["app", "batch", "config", "tests"]

@@ -1,0 +1,18 @@
+# Secrets and local settings: never commit
+.env
+*.pem
+infra/cloudformation/parameters.json
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Local data written when STORAGE_MODE=local, and build outputs
+local_data/
+dist/
+
+# macOS
+.DS_Store

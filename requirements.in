@@ -1,0 +1,11 @@
+# Direct runtime dependencies. requirements.txt pins these plus everything they pull in.
+pandas==3.0.3
+numpy==2.3.5
+flask==3.1.2
+gunicorn==23.0.0
+boto3==1.40.70
+psycopg[binary]==3.2.12
+requests==2.32.5
+# psycopg needs this on Python < 3.13. Listed here because pip skips marker-only
+# dependencies when building the Linux bundle on a newer Python.
+typing-extensions==4.15.0

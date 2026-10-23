@@ -1,0 +1,14 @@
+[
+  { "ParameterKey": "RepoUrl", "ParameterValue": "https://github.com/jaanvi-bajaj/TradeShift-Project.git" },
+  { "ParameterKey": "RepoRef", "ParameterValue": "main" },
+  { "ParameterKey": "WheelhouseUrl", "ParameterValue": "https://github.com/jaanvi-bajaj/TradeShift-Project/releases/download/deps-py311-v1/wheelhouse-py311-x86_64.tar.gz" },
+  { "ParameterKey": "SnapshotUrl", "ParameterValue": "https://github.com/jaanvi-bajaj/TradeShift-Project/releases/download/data-v1/tradeshift-processed.json" },
+  { "ParameterKey": "WheelhouseSha256", "ParameterValue": "<sha256 from the release notes>" },
+  { "ParameterKey": "SnapshotSha256", "ParameterValue": "<sha256 from the release notes>" },
+  { "ParameterKey": "PipelineMode", "ParameterValue": "snapshot" },
+  { "ParameterKey": "DBPassword", "ParameterValue": "<type a password: letters and digits, 8+ characters>" },
+  { "ParameterKey": "KeyName", "ParameterValue": "vockey" },
+  { "ParameterKey": "SshCidr", "ParameterValue": "<your.ip.address/32>" },
+  { "ParameterKey": "AlertEmail", "ParameterValue": "" },
+  { "ParameterKey": "EnableBudget", "ParameterValue": "false" }
+]

@@ -1,0 +1,255 @@
+iso2,name,census_code,comtrade_code,is_eu
+AD,Andorra,4271,20,0
+AE,United Arab Emirates,5200,784,0
+AF,Afghanistan,5310,4,0
+AG,Antigua and Barbuda,2484,28,0
+AI,Anguilla,2481,660,0
+AL,Albania,4810,8,0
+AM,Armenia,4631,51,0
+AO,Angola,7620,24,0
+AQ,AQ,,10,0
+AR,Argentina,3570,32,0
+AS,American Samoa,9510,16,0
+AT,Austria,4330,40,1
+AU,Australia,6021,36,0
+AW,Aruba,2779,533,0
+AX,AX,,248,0
+AZ,Azerbaijan,4632,31,0
+BA,Bosnia and Herzegovina,4793,70,0
+BB,Barbados,2720,52,0
+BD,Bangladesh,5380,50,0
+BE,Belgium,4231,56,1
+BF,Burkina Faso,7600,854,0
+BG,Bulgaria,4870,100,1
+BH,Bahrain,5250,48,0
+BI,Burundi,7670,108,0
+BJ,Benin,7610,204,0
+BL,BL,,652,0
+BM,Bermuda,2320,60,0
+BN,Brunei,5610,96,0
+BO,Bolivia,3350,68,0
+BQ,BQ,,80,0
+BR,Brazil,3510,76,0
+BS,Bahamas,2360,44,0
+BT,Bhutan,5682,64,0
+BV,BV,,74,0
+BW,Botswana,7930,72,0
+BY,Belarus,4622,112,0
+BZ,Belize,2080,84,0
+CA,Canada,1220,124,0
+CC,Cocos (Keeling) Islands,6023,166,0
+CD,"Congo, Democratic Republic of the Congo (formerly Za",7660,180,0
+CF,Central African Republic,7540,140,0
+CG,"Congo, Republic of the Congo",7630,178,0
+CH,Switzerland,4419,757,0
+CI,Cote d'Ivoire,7480,384,0
+CK,Cook Islands,6142,184,0
+CL,Chile,3370,152,0
+CM,Cameroon,7420,120,0
+CN,China,5700,156,0
+CO,Colombia,3010,170,0
+CR,Costa Rica,2230,188,0
+CU,Cuba,2390,192,0
+CV,Cabo Verde,7643,132,0
+CW,Curacao,2777,531,0
+CX,Christmas Island (in the Indian Ocean),6024,162,0
+CY,Cyprus,4910,196,1
+CZ,Czech Republic,4351,203,1
+DE,Germany (Federal Republic of Germany),4280,276,1
+DJ,Djibouti,7770,262,0
+DK,"Denmark, except Greenland",4099,208,1
+DM,Dominica,2486,212,0
+DO,Dominican Republic,2470,214,0
+DZ,Algeria,7210,12,0
+EC,Ecuador,3310,218,0
+EE,Estonia,4470,233,1
+EG,Egypt,7290,818,0
+EH,Western Sahara,7370,732,0
+ER,Eritrea,7741,232,0
+ES,Spain,4700,724,1
+ET,Ethiopia,7749,231,0
+FI,Finland,4050,246,1
+FJ,Fiji,6863,242,0
+FK,Falkland Islands (Islas Malvinas),3720,238,0
+FM,"Micronesia, Federated States of",6820,583,0
+FO,Faroe Islands,4091,234,0
+FR,France,4279,250,1
+GA,Gabon,7550,266,0
+GB,United Kingdom,4120,826,1
+GD,Grenada,2489,308,0
+GE,Georgia,4633,268,0
+GF,French Guiana,3170,,0
+GG,GG,,831,0
+GH,Ghana,7490,288,0
+GI,Gibraltar,4720,292,0
+GL,Greenland,1010,304,0
+GM,Gambia,7500,270,0
+GN,Guinea,7460,324,0
+GP,Guadeloupe,2831,,0
+GQ,Equatorial Guinea,7380,226,0
+GR,Greece,4840,300,1
+GS,GS,,239,0
+GT,Guatemala,2050,320,0
+GU,Guam,9350,316,0
+GW,Guinea-Bissau,7642,624,0
+GY,Guyana,3120,328,0
+GZ,Gaza Strip administered by Israel,5082,,0
+HK,Hong Kong,5820,344,0
+HM,Heard Island and McDonald Islands,6029,334,0
+HN,Honduras,2150,340,0
+HR,Croatia,4791,191,1
+HT,Haiti,2450,332,0
+HU,Hungary,4370,348,1
+ID,Indonesia,5600,360,0
+IE,Ireland,4190,372,1
+IL,Israel,5081,376,0
+IM,IM,,833,0
+IN,India,5330,699,0
+IO,British Indian Ocean Territory,7810,86,0
+IQ,Iraq,5050,368,0
+IR,Iran,5070,364,0
+IS,Iceland,4000,352,0
+IT,Italy,4759,380,1
+JE,JE,,832,0
+JM,Jamaica,2410,388,0
+JO,Jordan,5110,400,0
+JP,Japan,5880,392,0
+KE,Kenya,7790,404,0
+KG,Kyrgyzstan,4635,417,0
+KH,Cambodia,5550,116,0
+KI,Kiribati,6226,296,0
+KM,Comoros,7890,174,0
+KN,Saint Kitts and Nevis,2483,659,0
+KP,North Korea (Democratic People's Republic of Korea),5790,408,0
+KR,South Korea (Republic of Korea),5800,410,0
+KV,Kosovo,4803,,0
+KW,Kuwait,5130,414,0
+KY,Cayman Islands,2440,136,0
+KZ,Kazakhstan,4634,398,0
+LA,Laos (Lao People's Democratic Republic),5530,418,0
+LB,Lebanon,5040,422,0
+LC,Saint Lucia,2487,662,0
+LI,Liechtenstein,4411,438,0
+LK,Sri Lanka,5420,144,0
+LR,Liberia,7650,430,0
+LS,Lesotho,7990,426,0
+LT,Lithuania,4510,440,1
+LU,Luxembourg,4239,442,1
+LV,Latvia,4490,428,1
+LY,Libya,7250,434,0
+MA,Morocco,7140,504,0
+MC,Monaco,4272,492,0
+MD,Moldova (Republic of Moldova),4641,498,0
+ME,Montenegro,4804,499,0
+MF,MF,,663,0
+MG,Madagascar,7880,450,0
+MH,Marshall Islands,6810,584,0
+MK,North Macedonia,4794,807,0
+ML,Mali,7450,466,0
+MM,Burma (Myanmar),5460,104,0
+MN,Mongolia,5740,496,0
+MO,Macao,5660,446,0
+MP,Northern Mariana Islands,9610,580,0
+MQ,Martinique,2839,474,0
+MR,Mauritania,7410,478,0
+MS,Montserrat,2485,500,0
+MT,Malta,4730,470,1
+MU,Mauritius,7850,480,0
+MV,Maldives,5683,462,0
+MW,Malawi,7970,454,0
+MX,Mexico,2010,484,0
+MY,Malaysia,5570,458,0
+MZ,Mozambique,7870,508,0
+NA,Namibia,7920,516,0
+NC,New Caledonia,6412,540,0
+NE,Niger,7510,562,0
+NF,Norfolk Island,6022,574,0
+NG,Nigeria,7530,566,0
+NI,Nicaragua,2190,558,0
+NL,Netherlands,4210,528,1
+NO,Norway,4039,578,0
+NP,Nepal,5360,524,0
+NR,Naoero,6862,520,0
+NT,NT,,536,0
+NU,Niue,6144,570,0
+NZ,New Zealand,6141,554,0
+OM,Oman,5230,512,0
+PA,Panama,2250,591,0
+PE,Peru,3330,604,0
+PF,French Polynesia,6414,258,0
+PG,Papua New Guinea,6040,598,0
+PH,Philippines,5650,608,0
+PK,Pakistan,5350,586,0
+PL,Poland,4550,616,1
+PM,Saint Pierre and Miquelon,1610,666,0
+PN,Pitcairn Islands,6225,612,0
+PR,Puerto Rico,9030,630,0
+PS,PS,,275,0
+PT,Portugal,4710,620,1
+PU,PU,,849,0
+PW,Palau,6830,585,0
+PY,Paraguay,3530,600,0
+QA,Qatar,5180,634,0
+RE,Reunion,7904,,0
+RO,Romania,4850,642,1
+RS,Serbia,4801,688,0
+RU,Russia,4621,643,0
+RW,Rwanda,7690,646,0
+SA,Saudi Arabia,5170,682,0
+SB,Solomon Islands,6223,90,0
+SC,Seychelles,7800,690,0
+SD,Sudan,7321,729,0
+SE,Sweden,4010,752,1
+SG,Singapore,5590,702,0
+SH,Saint Helena,7580,654,0
+SI,Slovenia,4792,705,1
+SJ,Svalbard and Jan Mayen,4031,744,0
+SK,Slovakia,4359,703,1
+SL,Sierra Leone,7470,694,0
+SM,San Marino,4751,674,0
+SN,Senegal,7440,686,0
+SO,Somalia,7700,706,0
+SR,Suriname,3150,740,0
+SS,South Sudan,7323,728,0
+ST,Sao Tome and Principe,7644,678,0
+SV,El Salvador,2110,222,0
+SX,Sint Maarten,2774,534,0
+SY,Syria (Syrian Arab Republic),5020,760,0
+SZ,Eswatini,7950,748,0
+TC,Turks and Caicos Islands,2430,796,0
+TD,Chad,7560,148,0
+TF,French Southern and Antarctic Lands,7905,260,0
+TG,Togo,7520,768,0
+TH,Thailand,5490,764,0
+TJ,Tajikistan,4642,762,0
+TK,Tokelau,6143,772,0
+TL,Timor-Leste,5601,626,0
+TM,Turkmenistan,4643,795,0
+TN,Tunisia,7230,788,0
+TO,Tonga,6864,776,0
+TR,Turkey,4890,792,0
+TT,Trinidad and Tobago,2740,780,0
+TV,Tuvalu,6227,798,0
+TW,Taiwan,5830,490,0
+TZ,Tanzania (United Republic of Tanzania),7830,834,0
+UA,Ukraine,4623,804,0
+UG,Uganda,7780,800,0
+UM,United States Minor Outlying Islands,9800,581,0
+US,United States,1000,842,0
+UY,Uruguay,3550,858,0
+UZ,Uzbekistan,4644,860,0
+VA,Holy See (Vatican City),4752,336,0
+VC,Saint Vincent and the Grenadines,2488,670,0
+VE,Venezuela,3070,862,0
+VG,British Virgin Islands,2482,92,0
+VI,Virgin Islands of the United States,9110,,0
+VN,Vietnam,5520,704,0
+VU,Vanuatu,6224,548,0
+WE,West Bank administered by Israel,5083,,0
+WF,Wallis and Futuna,6413,876,0
+WS,Samoa (Western Samoa),6150,882,0
+YE,Yemen (Republic of Yemen),5210,887,0
+YT,Mayotte,7881,,0
+ZA,South Africa,7910,710,0
+ZM,Zambia,7940,894,0
+ZW,Zimbabwe,7960,716,0

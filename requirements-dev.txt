@@ -1,0 +1,7 @@
+# Development and CI tools (not installed on the servers).
+-r requirements.txt
+pytest==8.4.2
+black==25.9.0
+ruff==0.14.4
+# Only for scripts/build_tariff_lines.py (parses the Federal Register PDFs).
+pypdf==6.1.1

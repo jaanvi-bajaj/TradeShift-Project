@@ -1,0 +1,697 @@
+# TradeShift: the whole AWS environment in one CloudFormation stack.
+#
+# What it does: builds, from an empty AWS Academy Sandbox in us-east-1,
+#   network   VPC, 2 public + 2 private subnets in two AZs, internet gateway, S3 endpoint
+#   security  security groups: ALB open on port 80; web only from the ALB; RDS only from web + batch
+#   storage   S3 bucket for raw data and saved analyses (lifecycle rule, retained on delete)
+#   database  RDS PostgreSQL in the private subnets (automated backups, snapshot on delete)
+#   compute   batch EC2 server with an extra EBS data volume; it restores the data snapshot
+#             (or downloads from the APIs) and loads RDS
+#   scaling   launch template + Auto Scaling Group of stateless web servers behind an ALB,
+#             target-tracking on 50% average CPU
+#   monitoring CloudWatch log groups, alarms and dashboard; optional AWS Budgets alert
+# Inputs: the parameters below. Secrets (database password, API keys) are NoEcho parameters,
+#   typed into the console when the stack is created; they are never in Git.
+# Outputs: ALB URL, RDS endpoint, bucket name, dashboard link.
+# How to run: CloudFormation console > Create stack > upload this file (see RUNBOOK.md),
+#   or: aws cloudformation create-stack --stack-name tradeshift --template-body file://infra/cloudformation/tradeshift.yaml \
+#         --parameters file://infra/cloudformation/parameters.json
+#
+# Sandbox rules this template follows: IAM roles cannot be created, so every instance uses the
+# existing LabInstanceProfile (LabRole). No NAT Gateway (both EC2 tiers sit in public subnets).
+# Smallest sizes: t3.micro web, t3.small batch, db.t3.micro, gp2 volumes only, single-AZ RDS.
+
+AWSTemplateFormatVersion: "2010-09-09"
+Description: TradeShift - tariff trade-diversion tracker (VPC, ALB, ASG, RDS, S3, batch EC2, CloudWatch)
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label: { default: "Code and data (from GitHub)" }
+        Parameters: [RepoUrl, RepoRef, WheelhouseUrl, WheelhouseSha256, SnapshotUrl, SnapshotSha256, PipelineMode]
+      - Label: { default: "Secrets (typed in, never stored in Git)" }
+        Parameters: [DBPassword, CensusApiKey, ComtradeApiKey]
+      - Label: { default: "Access and alerts" }
+        Parameters: [KeyName, SshCidr, AlertEmail, EnableBudget]
+      - Label: { default: "Sizes" }
+        Parameters: [WebInstanceType, BatchInstanceType, DBInstanceClass, DBStorageGb, BatchDataVolumeGb, WebMinSize, WebMaxSize, WebDesiredSize, LatestAmiId]
+
+Parameters:
+  RepoUrl:
+    Type: String
+    Default: https://github.com/jaanvi-bajaj/TradeShift-Project.git
+    Description: Public GitHub repository that EC2 user data clones
+  RepoRef:
+    Type: String
+    Default: main
+    Description: Branch or tag to deploy
+  WheelhouseUrl:
+    Type: String
+    Default: https://github.com/jaanvi-bajaj/TradeShift-Project/releases/download/deps-py311-v1/wheelhouse-py311-x86_64.tar.gz
+    Description: Pinned Python packages for the servers (GitHub release asset, installed offline)
+  SnapshotUrl:
+    Type: String
+    Default: https://github.com/jaanvi-bajaj/TradeShift-Project/releases/download/data-v1/tradeshift-processed.json
+    Description: Manifest of the processed-data snapshot (GitHub release asset); its parts are fetched from the same release
+  WheelhouseSha256:
+    Type: String
+    Default: ""
+    Description: SHA-256 of the wheelhouse file (from the release notes); empty skips the check
+  SnapshotSha256:
+    Type: String
+    Default: ""
+    Description: SHA-256 of the snapshot manifest (from the release notes); empty skips the check
+  PipelineMode:
+    Type: String
+    Default: snapshot
+    AllowedValues: [snapshot, full]
+    Description: snapshot = load the pre-built data (fast, no external data APIs). full = download from Census/Comtrade (needs keys, hours)
+  DBPassword:
+    Type: String
+    NoEcho: true
+    MinLength: 8
+    MaxLength: 41
+    AllowedPattern: "[a-zA-Z0-9]+"
+    ConstraintDescription: 8-41 letters and digits
+    Description: Master password for RDS PostgreSQL (letters and digits only)
+  CensusApiKey:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: US Census API key. Only needed when PipelineMode is full
+  ComtradeApiKey:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: UN Comtrade API key. Only needed when PipelineMode is full
+  KeyName:
+    Type: String
+    Default: vockey
+    Description: Existing EC2 key pair for SSH (the Sandbox provides vockey)
+  SshCidr:
+    Type: String
+    Default: 127.0.0.1/32
+    AllowedPattern: '^(\d{1,3}\.){3}\d{1,3}/\d{1,2}$'
+    Description: Your IP as x.x.x.x/32 to allow SSH to the batch server. The default allows nobody
+  AlertEmail:
+    Type: String
+    Default: ""
+    Description: Optional email for CloudWatch alarm and budget notifications
+  EnableBudget:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: Create the US$10 AWS Budgets alert. Leave false if the Sandbox blocks AWS Budgets
+  WebInstanceType:
+    Type: String
+    Default: t3.micro
+    AllowedValues: [t3.nano, t3.micro, t3.small, t2.micro, t2.small]
+  BatchInstanceType:
+    Type: String
+    Default: t3.small
+    AllowedValues: [t3.micro, t3.small, t3.medium]
+    Description: t3.small is enough for snapshot mode; use t3.medium for a full download run
+  DBInstanceClass:
+    Type: String
+    Default: db.t3.micro
+    AllowedValues: [db.t3.micro, db.t3.small, db.t4g.micro]
+  DBStorageGb:
+    Type: Number
+    Default: 20
+    MinValue: 20
+    MaxValue: 100
+  BatchDataVolumeGb:
+    Type: Number
+    Default: 20
+    MinValue: 8
+    MaxValue: 30
+    Description: EBS data volume for the batch job's working files (Sandbox limit 35 GB per volume)
+  WebMinSize:
+    Type: Number
+    Default: 2
+    Description: Two keeps one web server in each AZ, so the load-balancing test always sees two instances
+  WebMaxSize:
+    Type: Number
+    Default: 3
+    Description: Upper limit for scale-out (Sandbox allows 9 instances in total)
+  WebDesiredSize:
+    Type: Number
+    Default: 2
+  LatestAmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
+    Description: Amazon Linux 2023, resolved at stack creation
+
+Conditions:
+  HasAlertEmail: !Not [!Equals [!Ref AlertEmail, ""]]
+  CreateBudget: !And [!Equals [!Ref EnableBudget, "true"], !Condition HasAlertEmail]
+
+Resources:
+  # =====================================================================
+  # NETWORK: one VPC across two Availability Zones (Week 3, Week 5)
+  # =====================================================================
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.20.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags: [{ Key: Name, Value: tradeshift-vpc }]
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags: [{ Key: Name, Value: tradeshift-igw }]
+
+  GatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref InternetGateway
+
+  # Public subnets: the ALB, the web servers and the batch server. Why web servers are
+  # public: private servers would need a NAT Gateway to reach GitHub, which costs money
+  # every hour. Their security group still only accepts traffic from the ALB.
+  PublicSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 10.20.1.0/24
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags: [{ Key: Name, Value: tradeshift-public-a }]
+
+  PublicSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 10.20.2.0/24
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags: [{ Key: Name, Value: tradeshift-public-b }]
+
+  # Private subnets: only RDS. They have no route to the internet at all.
+  PrivateSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 10.20.11.0/24
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      Tags: [{ Key: Name, Value: tradeshift-private-a }]
+
+  PrivateSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 10.20.12.0/24
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      Tags: [{ Key: Name, Value: tradeshift-private-b }]
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags: [{ Key: Name, Value: tradeshift-public-rt }]
+
+  PublicDefaultRoute:
+    Type: AWS::EC2::Route
+    DependsOn: GatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnetARoutes:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: { SubnetId: !Ref PublicSubnetA, RouteTableId: !Ref PublicRouteTable }
+
+  PublicSubnetBRoutes:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: { SubnetId: !Ref PublicSubnetB, RouteTableId: !Ref PublicRouteTable }
+
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags: [{ Key: Name, Value: tradeshift-private-rt }]
+
+  PrivateSubnetARoutes:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: { SubnetId: !Ref PrivateSubnetA, RouteTableId: !Ref PrivateRouteTable }
+
+  PrivateSubnetBRoutes:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: { SubnetId: !Ref PrivateSubnetB, RouteTableId: !Ref PrivateRouteTable }
+
+  # Free gateway endpoint: S3 traffic from the servers stays on the AWS network.
+  S3Endpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.s3
+      VpcEndpointType: Gateway
+      RouteTableIds: [!Ref PublicRouteTable, !Ref PrivateRouteTable]
+
+  # =====================================================================
+  # SECURITY: security groups chain ALB -> web -> database (Week 4)
+  # =====================================================================
+  AlbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: TradeShift load balancer - HTTP from the internet
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - { IpProtocol: tcp, FromPort: 80, ToPort: 80, CidrIp: 0.0.0.0/0, Description: Users }
+      Tags: [{ Key: Name, Value: tradeshift-alb-sg }]
+
+  WebSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: TradeShift web servers - app port from the ALB only
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - { IpProtocol: tcp, FromPort: 8000, ToPort: 8000, SourceSecurityGroupId: !Ref AlbSecurityGroup, Description: ALB to gunicorn }
+      Tags: [{ Key: Name, Value: tradeshift-web-sg }]
+
+  BatchSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: TradeShift batch server - SSH from one IP only
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - { IpProtocol: tcp, FromPort: 22, ToPort: 22, CidrIp: !Ref SshCidr, Description: SSH from the deployer }
+      Tags: [{ Key: Name, Value: tradeshift-batch-sg }]
+
+  DatabaseSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: TradeShift RDS - PostgreSQL from web and batch servers only
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, SourceSecurityGroupId: !Ref WebSecurityGroup, Description: Web servers }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, SourceSecurityGroupId: !Ref BatchSecurityGroup, Description: Batch server }
+      Tags: [{ Key: Name, Value: tradeshift-db-sg }]
+
+  # =====================================================================
+  # STORAGE: S3 for raw data and saved analyses (Week 7)
+  # =====================================================================
+  # Why S3 for saved analyses: every web server in the Auto Scaling Group sees the same
+  # bucket. An EBS volume attaches to one instance only.
+  DataBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain          # data survives "Delete stack" (brief, CloudFormation rules)
+    UpdateReplacePolicy: Retain
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 }
+      LifecycleConfiguration:
+        Rules:
+          # Raw API responses are read once by clean.py, then rarely: move them to a cheaper class.
+          - Id: raw-to-infrequent-access
+            Status: Enabled
+            Prefix: raw/
+            Transitions:
+              - { StorageClass: STANDARD_IA, TransitionInDays: 30 }
+      Tags: [{ Key: Project, Value: tradeshift }]
+
+  # =====================================================================
+  # DATABASE: RDS PostgreSQL in the private subnets (Week 8)
+  # =====================================================================
+  DatabaseSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: TradeShift private subnets for RDS
+      SubnetIds: [!Ref PrivateSubnetA, !Ref PrivateSubnetB]
+
+  Database:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Snapshot        # a final snapshot is kept when the stack is deleted
+    UpdateReplacePolicy: Snapshot
+    Metadata:
+      cfn-lint:
+        config:
+          # The linter prefers Secrets Manager; it is not available in the Sandbox, and the
+          # brief asks for a NoEcho parameter, so the password is typed in at stack creation.
+          ignore_checks: [W1011]
+    Properties:
+      Engine: postgres
+      EngineVersion: "16"
+      DBInstanceClass: !Ref DBInstanceClass
+      AllocatedStorage: !Ref DBStorageGb
+      StorageType: gp2
+      DBName: tradeshift
+      MasterUsername: tradeshift
+      MasterUserPassword: !Ref DBPassword
+      DBSubnetGroupName: !Ref DatabaseSubnetGroup
+      VPCSecurityGroups: [!Ref DatabaseSecurityGroup]
+      PubliclyAccessible: false      # no public address: unreachable from a laptop
+      MultiAZ: false                 # the Sandbox does not allow Multi-AZ
+      BackupRetentionPeriod: 1       # automated daily backups on (Week 8)
+      MonitoringInterval: 0          # enhanced monitoring is not supported in the Sandbox
+      EnablePerformanceInsights: false
+      DeletionProtection: false      # so "Delete stack" can clean up after grading
+      Tags: [{ Key: Project, Value: tradeshift }]
+
+  # =====================================================================
+  # COMPUTE: batch server with its own EBS data volume (Week 6, Week 7)
+  # =====================================================================
+  # Why EC2, not Lambda: a full download runs for hours, past Lambda's 15-minute limit.
+  BatchServer:
+    Type: AWS::EC2::Instance
+    CreationPolicy:
+      ResourceSignal: { Count: 1, Timeout: PT40M }   # the stack waits until RDS is loaded
+    Properties:
+      ImageId: !Ref LatestAmiId
+      InstanceType: !Ref BatchInstanceType
+      KeyName: !Ref KeyName
+      IamInstanceProfile: LabInstanceProfile
+      SubnetId: !Ref PublicSubnetA
+      SecurityGroupIds: [!Ref BatchSecurityGroup]
+      MetadataOptions: { HttpTokens: required, HttpEndpoint: enabled }
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs: { VolumeSize: 16, VolumeType: gp2, DeleteOnTermination: true }
+        # The data volume holds the pipeline's working files; it is snapshotted after each run.
+        - DeviceName: /dev/sdf
+          Ebs: { VolumeSize: !Ref BatchDataVolumeGb, VolumeType: gp2, DeleteOnTermination: true }
+      Tags:
+        - { Key: Name, Value: tradeshift-batch }
+        - { Key: Project, Value: tradeshift }
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          # Batch server bootstrap: install tools, clone the repo, run the pipeline, signal CloudFormation.
+          set -euo pipefail
+          exec > >(tee -a /var/log/tradeshift-bootstrap.log) 2>&1
+          signal() { /opt/aws/bin/cfn-signal -e "$1" --stack ${AWS::StackName} --resource BatchServer --region ${AWS::Region} || true; }
+          trap 'signal 1' ERR
+          dnf install -y python3.11 python3.11-pip git amazon-cloudwatch-agent aws-cfn-bootstrap
+          # Settings for the app code. Secrets come from NoEcho parameters; the file is root-only.
+          install -m 600 /dev/null /etc/tradeshift.env
+          cat > /etc/tradeshift.env <<'ENV'
+          STORAGE_MODE=s3
+          AWS_REGION=${AWS::Region}
+          S3_BUCKET=${DataBucket}
+          DB_HOST=${Database.Endpoint.Address}
+          DB_PORT=${Database.Endpoint.Port}
+          DB_NAME=tradeshift
+          DB_USER=tradeshift
+          DB_PASSWORD=${DBPassword}
+          CENSUS_API_KEY=${CensusApiKey}
+          COMTRADE_API_KEY=${ComtradeApiKey}
+          WORK_DIR=/data/work
+          SNAPSHOT_URL=${SnapshotUrl}
+          SNAPSHOT_SHA256=${SnapshotSha256}
+          LOG_GROUP=${BatchLogGroup}
+          ENV
+          git clone --depth 1 --branch ${RepoRef} ${RepoUrl} /opt/tradeshift
+          bash /opt/tradeshift/infra/scripts/install_app.sh "${WheelhouseUrl}" "${WheelhouseSha256}" batch
+          bash /opt/tradeshift/infra/scripts/batch_run.sh ${PipelineMode}
+          signal 0
+
+  # =====================================================================
+  # SCALING: launch template, ALB and Auto Scaling Group (Week 6, Week 9)
+  # =====================================================================
+  WebLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateData:
+        ImageId: !Ref LatestAmiId
+        InstanceType: !Ref WebInstanceType
+        KeyName: !Ref KeyName
+        IamInstanceProfile: { Name: LabInstanceProfile }
+        SecurityGroupIds: [!Ref WebSecurityGroup]
+        # 1-minute CPU metrics (basic monitoring reports every 5 minutes), so the
+        # scaling policy reacts within minutes during the load test.
+        Monitoring: { Enabled: true }
+        MetadataOptions: { HttpTokens: required, HttpEndpoint: enabled }
+        TagSpecifications:
+          - ResourceType: instance
+            Tags:
+              - { Key: Name, Value: tradeshift-web }
+              - { Key: Project, Value: tradeshift }
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            # Web server bootstrap: install tools, clone the repo, start gunicorn, signal CloudFormation.
+            # Nothing is stored on this server, so the Auto Scaling Group can replace it at any time.
+            set -euo pipefail
+            exec > >(tee -a /var/log/tradeshift-bootstrap.log) 2>&1
+            signal() { /opt/aws/bin/cfn-signal -e "$1" --stack ${AWS::StackName} --resource WebAutoScalingGroup --region ${AWS::Region} || true; }
+            trap 'signal 1' ERR
+            dnf install -y python3.11 python3.11-pip git amazon-cloudwatch-agent aws-cfn-bootstrap
+            install -m 600 /dev/null /etc/tradeshift.env
+            cat > /etc/tradeshift.env <<'ENV'
+            STORAGE_MODE=s3
+            AWS_REGION=${AWS::Region}
+            S3_BUCKET=${DataBucket}
+            DB_HOST=${Database.Endpoint.Address}
+            DB_PORT=${Database.Endpoint.Port}
+            DB_NAME=tradeshift
+            DB_USER=tradeshift
+            DB_PASSWORD=${DBPassword}
+            LOG_GROUP=${WebLogGroup}
+            ENV
+            git clone --depth 1 --branch ${RepoRef} ${RepoUrl} /opt/tradeshift
+            bash /opt/tradeshift/infra/scripts/install_app.sh "${WheelhouseUrl}" "${WheelhouseSha256}" web
+            bash /opt/tradeshift/infra/scripts/web_start.sh
+            signal 0
+
+  WebTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      VpcId: !Ref Vpc
+      Protocol: HTTP
+      Port: 8000
+      TargetType: instance
+      HealthCheckPath: /health
+      # Forgiving on purpose: under heavy CPU load /health can take a few seconds,
+      # and a server should not be replaced for that. 5 failures x 15 s = 75 s.
+      HealthCheckIntervalSeconds: 15
+      HealthCheckTimeoutSeconds: 10
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 5
+      TargetGroupAttributes:
+        - { Key: deregistration_delay.timeout_seconds, Value: "30" }
+      Tags: [{ Key: Project, Value: tradeshift }]
+
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Scheme: internet-facing
+      Type: application
+      Subnets: [!Ref PublicSubnetA, !Ref PublicSubnetB]
+      SecurityGroups: [!Ref AlbSecurityGroup]
+      Tags: [{ Key: Project, Value: tradeshift }]
+
+  HttpListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Protocol: HTTP
+      Port: 80
+      DefaultActions:
+        - { Type: forward, TargetGroupArn: !Ref WebTargetGroup }
+
+  WebAutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    CreationPolicy:
+      ResourceSignal: { Count: !Ref WebMinSize, Timeout: PT20M }
+    UpdatePolicy:
+      AutoScalingRollingUpdate:
+        MinInstancesInService: 1
+        MaxBatchSize: 1
+        WaitOnResourceSignals: true
+        PauseTime: PT15M
+    Properties:
+      LaunchTemplate:
+        LaunchTemplateId: !Ref WebLaunchTemplate
+        Version: !GetAtt WebLaunchTemplate.LatestVersionNumber
+      VPCZoneIdentifier: [!Ref PublicSubnetA, !Ref PublicSubnetB]
+      MinSize: !Ref WebMinSize
+      MaxSize: !Ref WebMaxSize
+      DesiredCapacity: !Ref WebDesiredSize
+      TargetGroupARNs: [!Ref WebTargetGroup]
+      HealthCheckType: ELB            # replace servers the ALB marks unhealthy (failover test)
+      HealthCheckGracePeriod: 300
+      MetricsCollection:
+        - Granularity: 1Minute
+          Metrics: [GroupInServiceInstances, GroupDesiredCapacity]
+      Tags:
+        - { Key: Project, Value: tradeshift, PropagateAtLaunch: true }
+
+  # Feature 6: keep average CPU across the web servers near 50%.
+  CpuTargetTracking:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AutoScalingGroupName: !Ref WebAutoScalingGroup
+      PolicyType: TargetTrackingScaling
+      EstimatedInstanceWarmup: 180
+      TargetTrackingConfiguration:
+        PredefinedMetricSpecification: { PredefinedMetricType: ASGAverageCPUUtilization }
+        TargetValue: 50
+
+  # =====================================================================
+  # MONITORING: logs, alarms, dashboard, budget (Week 2, Week 9)
+  # =====================================================================
+  WebLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties: { LogGroupName: !Sub "/tradeshift/${AWS::StackName}/web", RetentionInDays: 7 }
+
+  BatchLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties: { LogGroupName: !Sub "/tradeshift/${AWS::StackName}/batch", RetentionInDays: 7 }
+
+  AlarmTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub "${AWS::StackName}-alarms"
+      Subscription: !If
+        - HasAlertEmail
+        - [{ Endpoint: !Ref AlertEmail, Protocol: email }]
+        - !Ref AWS::NoValue
+
+  HighCpuAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Web servers' average CPU above 50% for 2 minutes (scale-out expected)
+      Namespace: AWS/EC2
+      MetricName: CPUUtilization
+      Dimensions: [{ Name: AutoScalingGroupName, Value: !Ref WebAutoScalingGroup }]
+      Statistic: Average
+      Period: 60
+      EvaluationPeriods: 2
+      Threshold: 50
+      ComparisonOperator: GreaterThanThreshold
+      AlarmActions: [!Ref AlarmTopic]
+
+  UnhealthyHostAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: At least one web server is failing ALB health checks
+      Namespace: AWS/ApplicationELB
+      MetricName: UnHealthyHostCount
+      Dimensions:
+        - { Name: LoadBalancer, Value: !GetAtt LoadBalancer.LoadBalancerFullName }
+        - { Name: TargetGroup, Value: !GetAtt WebTargetGroup.TargetGroupFullName }
+      Statistic: Maximum
+      Period: 60
+      EvaluationPeriods: 2
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
+
+  Http5xxAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Web servers returned more than 10 server errors in 5 minutes
+      Namespace: AWS/ApplicationELB
+      MetricName: HTTPCode_Target_5XX_Count
+      Dimensions: [{ Name: LoadBalancer, Value: !GetAtt LoadBalancer.LoadBalancerFullName }]
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 10
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
+
+  DatabaseCpuAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: RDS CPU above 80% for 5 minutes
+      Namespace: AWS/RDS
+      MetricName: CPUUtilization
+      Dimensions: [{ Name: DBInstanceIdentifier, Value: !Ref Database }]
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 80
+      ComparisonOperator: GreaterThanThreshold
+      AlarmActions: [!Ref AlarmTopic]
+
+  DatabaseStorageAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: RDS free storage below 2 GB
+      Namespace: AWS/RDS
+      MetricName: FreeStorageSpace
+      Dimensions: [{ Name: DBInstanceIdentifier, Value: !Ref Database }]
+      Statistic: Minimum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 2000000000
+      ComparisonOperator: LessThanThreshold
+      AlarmActions: [!Ref AlarmTopic]
+
+  Dashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Sub "${AWS::StackName}-dashboard"
+      DashboardBody: !Sub
+        - |
+          {"widgets":[
+            {"type":"metric","x":0,"y":0,"width":12,"height":6,"properties":{"title":"ALB requests","region":"${AWS::Region}","stat":"Sum","period":60,
+              "metrics":[["AWS/ApplicationELB","RequestCount","LoadBalancer","${Alb}"]]}},
+            {"type":"metric","x":12,"y":0,"width":12,"height":6,"properties":{"title":"Healthy and unhealthy web servers","region":"${AWS::Region}","stat":"Maximum","period":60,
+              "metrics":[["AWS/ApplicationELB","HealthyHostCount","TargetGroup","${Tg}","LoadBalancer","${Alb}"],[".","UnHealthyHostCount",".",".",".","."]]}},
+            {"type":"metric","x":0,"y":6,"width":12,"height":6,"properties":{"title":"Web CPU (target 50%) and instances in service","region":"${AWS::Region}","period":60,
+              "metrics":[["AWS/EC2","CPUUtilization","AutoScalingGroupName","${Asg}",{"stat":"Average"}],["AWS/AutoScaling","GroupInServiceInstances","AutoScalingGroupName","${Asg}",{"stat":"Maximum","yAxis":"right"}]],
+              "annotations":{"horizontal":[{"label":"target","value":50}]}}},
+            {"type":"metric","x":12,"y":6,"width":12,"height":6,"properties":{"title":"RDS connections and CPU","region":"${AWS::Region}","period":60,
+              "metrics":[["AWS/RDS","DatabaseConnections","DBInstanceIdentifier","${Db}",{"stat":"Maximum"}],[".","CPUUtilization",".",".",{"stat":"Average","yAxis":"right"}]]}},
+            {"type":"metric","x":0,"y":12,"width":12,"height":6,"properties":{"title":"Response time (seconds)","region":"${AWS::Region}","stat":"Average","period":60,
+              "metrics":[["AWS/ApplicationELB","TargetResponseTime","LoadBalancer","${Alb}"]]}},
+            {"type":"metric","x":12,"y":12,"width":12,"height":6,"properties":{"title":"HTTP 5xx from web servers","region":"${AWS::Region}","stat":"Sum","period":60,
+              "metrics":[["AWS/ApplicationELB","HTTPCode_Target_5XX_Count","LoadBalancer","${Alb}"]]}}
+          ]}
+        - Alb: !GetAtt LoadBalancer.LoadBalancerFullName
+          Tg: !GetAtt WebTargetGroup.TargetGroupFullName
+          Asg: !Ref WebAutoScalingGroup
+          Db: !Ref Database
+
+  # AWS Budgets is not on the Sandbox service list, so this is off unless EnableBudget=true.
+  CostBudget:
+    Type: AWS::Budgets::Budget
+    Condition: CreateBudget
+    Properties:
+      Budget:
+        BudgetName: !Sub "${AWS::StackName}-monthly"
+        BudgetType: COST
+        TimeUnit: MONTHLY
+        BudgetLimit: { Amount: 10, Unit: USD }
+      NotificationsWithSubscribers:
+        - Notification: { NotificationType: ACTUAL, ComparisonOperator: GREATER_THAN, Threshold: 80, ThresholdType: PERCENTAGE }
+          Subscribers: [{ SubscriptionType: EMAIL, Address: !Ref AlertEmail }]
+        - Notification: { NotificationType: FORECASTED, ComparisonOperator: GREATER_THAN, Threshold: 100, ThresholdType: PERCENTAGE }
+          Subscribers: [{ SubscriptionType: EMAIL, Address: !Ref AlertEmail }]
+
+Outputs:
+  AppUrl:
+    Description: Open this to use TradeShift
+    Value: !Sub "http://${LoadBalancer.DNSName}"
+  RdsEndpoint:
+    Description: Database address (reachable only from the web and batch servers)
+    Value: !GetAtt Database.Endpoint.Address
+  BucketName:
+    Description: S3 bucket for raw data and saved analyses
+    Value: !Ref DataBucket
+  BatchServerId:
+    Description: Batch EC2 instance (connect with Session Manager or SSH)
+    Value: !Ref BatchServer
+  BatchServerPublicIp:
+    Description: For SSH if SshCidr allows your IP
+    Value: !GetAtt BatchServer.PublicIp
+  AutoScalingGroup:
+    Description: Web server group
+    Value: !Ref WebAutoScalingGroup
+  DashboardUrl:
+    Description: CloudWatch dashboard
+    Value: !Sub "https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=${AWS::StackName}-dashboard"
