@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Home{% endblock %}
+{% block filterbar %}{% endblock %}
+{% block content %}
+<section class="hero">
+  <h1>Where did trade go when the tariffs hit?</h1>
+  <p>TradeShift flags products where a tariffed supplier lost share of US imports and another country gained it,
+     measures how concentrated each product's sourcing is, and explains every shift in plain language.</p>
+  {% if status.signals is defined and status.signals %}
+  <div class="stats">
+    <div><strong>{{ "{:,}".format(status.signals) }}</strong><span>flagged product shifts</span></div>
+    <div><strong>{{ "{:,}".format(status.products) }}</strong><span>HS6 products tracked</span></div>
+    <div><strong>{{ status.first_month | month }} – {{ status.last_month | month }}</strong><span>monthly US imports</span></div>
+    <div><strong>{{ events | length }}</strong><span>tariff events (2016–2019)</span></div>
+  </div>
+  {% else %}
+  <p class="warning">Trade data is still loading. The batch server fills the database a few minutes after the stack is created.</p>
+  {% endif %}
+</section>
+
+{% if top %}
+<section>
+  <h2>Biggest shifts</h2>
+  <table>
+    <thead><tr><th>Product</th><th>From → to</th><th class="num">Value redirected</th><th>Summary</th></tr></thead>
+    <tbody>
+    {% for s in top %}
+      <tr><td><a href="/explorer?hs6={{ s.hs6 }}">{{ s.hs6 | product(s.description, 40) }}</a></td>
+          <td>{{ s.pair }}</td><td class="num">{{ s.value_redirected_usd | usd_m }}</td><td class="wide">{{ s.explanation }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <p><a href="/movers">All top movers →</a></p>
+</section>
+{% endif %}
+
+<section>
+  <h2>Validation: difference-in-differences, one per tariff event</h2>
+  <p class="muted">β is how many more points the tariffed suppliers' share fell in tariffed products than in untariffed
+     products in the same HS4 headings (product and month fixed effects, errors clustered by product).
+     It checks the detector; it is not a claim about any single product. With fewer than 5 control products the
+     estimate is marked "too few" and should not be relied on.</p>
+  <table>
+    <thead><tr><th>Event</th><th>Effective</th><th class="num">β (pts)</th><th class="num">Std. error</th>
+               <th class="num">Treated products</th><th class="num">Control products</th></tr></thead>
+    <tbody>
+    {% for e in events %}
+      {% set d = did.get(e.event_id) %}
+      <tr><td><a href="/detector?event_id={{ e.event_id }}">{{ e.name }}</a></td><td>{{ e.effective_date | string | month }}</td>
+          <td class="num">{{ '%+.1f' % d.beta_pp if d and d.beta_pp is not none and d.beta_pp == d.beta_pp else '–' }}</td>
+          <td class="num">{{ '%.1f' % d.se_pp if d and d.se_pp is not none and d.se_pp == d.se_pp else '–' }}</td>
+          <td class="num">{{ d.n_treated if d else '–' }}</td><td class="num">{{ d.n_control if d else '–' }}{% if d and d.n_control < 5 %} <span class="badge lower">too few</span>{% endif %}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="cards">
+  {% for endpoint, label in nav %}<a class="card" href="{{ url_for(endpoint) }}">{{ label }} →</a>{% endfor %}
+</section>
+{% endblock %}
