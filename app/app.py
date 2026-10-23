@@ -29,7 +29,7 @@ from flask import Flask, jsonify, render_template, request
 
 from app import db
 from app.formatting import FILTERS
-from app.views import common, concentration, detector, explorer, movers, singapore
+from app.views import common, compare, concentration, detector, explorer, movers, singapore
 from config.database import apply_schema
 from config.logging_config import setup_logging
 from config.settings import settings
@@ -43,6 +43,7 @@ PAGES = [
     (concentration, "concentration.page", "Concentration"),
     (movers, "movers.page", "Top movers"),
     (singapore, "singapore.page", "Singapore lens"),
+    (compare, "compare.page", "Compare"),
 ]
 NAV = [(endpoint, label) for _, endpoint, label in PAGES]
 
