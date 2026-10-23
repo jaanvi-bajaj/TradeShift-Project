@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% from "_analysis.html" import render with context %}
+{% block title %}Diversion detector{% endblock %}
+{% block filterbar %}{% endblock %}
+{% block controls %}
+<form class="controls sliders" method="get">
+  <label>Tariff event
+    <select name="event_id">
+      <option value="" {{ 'selected' if not event_id }}>All events</option>
+      {% for e in events %}<option value="{{ e.event_id }}" {{ 'selected' if e.event_id == event_id }}>{{ e.name }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Tariffed supplier loses at least <output>{{ '%g' % t.min_drop_pp }}</output> pts
+    <input type="range" name="min_drop" min="1" max="20" step="0.5" value="{{ t.min_drop_pp }}" data-output>
+  </label>
+  <label>Another supplier gains at least <output>{{ '%g' % t.min_gain_pp }}</output> pts
+    <input type="range" name="min_gain" min="1" max="20" step="0.5" value="{{ t.min_gain_pp }}" data-output>
+  </label>
+  <label>Annual imports at least US$<output>{{ '%g' % (t.min_annual_value_usd / 1e6) }}</output>m
+    <input type="range" name="min_value" min="0" max="500" step="5" value="{{ t.min_annual_value_usd / 1e6 }}" data-output>
+  </label>
+  <label><input type="checkbox" name="confidence" value="higher" {{ 'checked' if only_higher }}> Higher confidence only</label>
+  <button type="submit">Run detector</button>
+  <a href="{{ url_for('detector.page', event_id=event_id) }}">Reset to defaults ({{ '%g' % defaults.min_drop_pp }} / {{ '%g' % defaults.min_gain_pp }} pts, US${{ '%g' % (defaults.min_annual_value_usd / 1e6) }}m)</a>
+</form>
+{% endblock %}
+{% block content %}
+{% if did %}
+<aside class="validation">
+  <strong>Validation for this event (difference-in-differences):</strong>
+  {% if did.beta_pp is not none and did.beta_pp == did.beta_pp %}
+    the tariffed suppliers' share fell {{ '%.1f' % (-did.beta_pp) }} points more in the {{ did.n_treated }} tariffed products
+    than in {{ did.n_control }} untariffed products in the same HS4 headings (standard error {{ '%.1f' % did.se_pp }},
+    t = {{ '%.1f' % did.t_stat }}). This checks the detector as a whole; it does not prove any single flag.
+    {% if did.n_control < 5 %}<br><strong>Too few untariffed control products ({{ did.n_control }}) to rely on this estimate.</strong>{% endif %}
+  {% else %}
+    not enough untariffed control products ({{ did.n_control }}) in the same HS4 headings to run the check.
+  {% endif %}
+</aside>
+{% endif %}
+{{ render(a) }}
+{% endblock %}

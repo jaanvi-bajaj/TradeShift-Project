@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% from "_analysis.html" import render with context %}
+{% block title %}Top movers{% endblock %}
+{% block filterbar %}{% endblock %}
+{% block controls %}
+<form class="controls" method="get">
+  <label>Tariff event
+    <select name="event_id" onchange="this.form.submit()">
+      <option value="" {{ 'selected' if not event_id }}>All events</option>
+      {% for e in events %}<option value="{{ e.event_id }}" {{ 'selected' if e.event_id == event_id }}>{{ e.name }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Show top <input type="number" name="n" value="{{ n }}" min="5" max="100" step="5"></label>
+  <button type="submit">Update</button>
+</form>
+{% endblock %}
+{% block content %}{{ render(a) }}{% endblock %}

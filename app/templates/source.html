@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Source{% endblock %}
+{% block filterbar %}{% endblock %}
+{% block content %}
+<h1>Source data: HS {{ prod.hs6 | hs }} {{ prod.description | lower }}</h1>
+{% if ev %}
+<p>Tariff event: <strong>{{ ev.name }}</strong>, effective {{ ev.effective_date }}.
+   Legal source: <a href="{{ ev.source_url }}" target="_blank" rel="noopener">{{ ev.source_url }}</a></p>
+<p>Comparison windows: before {{ month_label(before[0]) }} – {{ month_label(before[-1]) }};
+   after {{ month_label(after[0]) }} – {{ month_label(after[-1]) }} (months right after the tariff are skipped for goods in transit).</p>
+{% endif %}
+<h2>Query</h2>
+<p class="muted">The numbers below were downloaded once with this US Census API query and are served from our database,
+   so this page never calls an external API. Replace YOUR_CENSUS_KEY with a free key to rerun it.</p>
+<pre class="query">{{ query }}</pre>
+{% if shares %}
+<h2>Supplier shares before and after</h2>
+<table>
+  <thead><tr><th>Supplier</th><th>Tariffed</th><th class="num">Value before (12m)</th><th class="num">Share before</th>
+             <th class="num">Value after (12m)</th><th class="num">Share after</th><th class="num">Change</th>
+             <th class="num">Quantity share before → after</th></tr></thead>
+  <tbody>
+  {% for s in shares[:15] %}
+    <tr><td>{{ s.name }}</td><td>{{ 'yes' if s.tariffed else 'no' }}</td>
+        <td class="num">{{ s.value_before | usd_m }}</td><td class="num">{{ s.share_before | pct(1, true) }}</td>
+        <td class="num">{{ s.value_after | usd_m }}</td><td class="num">{{ s.share_after | pct(1, true) }}</td>
+        <td class="num">{{ (((s.share_after or 0) - (s.share_before or 0)) * 100) | pts }}</td>
+        <td class="num">{{ s.qshare_before | pct(1, true) }} → {{ s.qshare_after | pct(1, true) }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% if not pivot.empty %}
+<h2>Monthly imports by supplier (US$ millions)</h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>Month</th>{% for c in pivot.columns %}<th class="num">{{ names.get(c, c) }}</th>{% endfor %}</tr></thead>
+  <tbody>
+  {% for month, row in pivot.iterrows() %}
+    <tr><td>{{ month_label(month) }}</td>{% for c in pivot.columns %}<td class="num">{{ row[c] | usd_m }}</td>{% endfor %}</tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% from "_analysis.html" import render with context %}
+{% block title %}Singapore lens{% endblock %}
+{% block filterbar %}{% endblock %}
+{% block controls %}
+<form class="controls" method="get">
+  <label><input type="radio" name="all" value="0" {{ 'checked' if not show_all }} onchange="this.form.submit()"> Flagged products only</label>
+  <label><input type="radio" name="all" value="1" {{ 'checked' if show_all }} onchange="this.form.submit()"> All tariffed products with re-exports</label>
+</form>
+<aside class="note-box">This shows Singapore's hub role growing, not proof of transshipment: US data records country of
+  origin, so goods re-exported through Singapore are still counted under where they were made.</aside>
+{% endblock %}
+{% block content %}{{ render(a) }}{% endblock %}
